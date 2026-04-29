@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../api/auth.js';
 
-function Login() {
+function Login({ onAuthSuccess }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -25,7 +25,8 @@ function Login() {
 
     try {
       await login(formData);
-      navigate('/');
+      onAuthSuccess();
+      navigate('/dashboard');
     } catch (authError) {
       setError(authError.message);
     } finally {

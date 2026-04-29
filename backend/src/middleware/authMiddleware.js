@@ -26,3 +26,14 @@ export const protect = async (req, res, next) => {
     next(error);
   }
 };
+
+export const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403);
+      return next(new Error('Not authorized for this role'));
+    }
+
+    return next();
+  };
+};

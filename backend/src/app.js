@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import profileRoutes from './routes/profileRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 
@@ -18,6 +19,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/users', userRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

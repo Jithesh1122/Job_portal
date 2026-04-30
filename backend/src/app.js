@@ -1,5 +1,7 @@
 import cors from 'cors';
 import express from 'express';
+import applicationRoutes from './routes/applicationRoutes.js';
+import jobRoutes from './routes/jobRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
@@ -18,6 +20,8 @@ app.get('/', (req, res) => {
   res.json({ message: 'MERN backend is running' });
 });
 
+app.use('/api/applications', applicationRoutes);
+app.use('/api/jobs', jobRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 

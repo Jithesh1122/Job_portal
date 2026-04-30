@@ -3,18 +3,21 @@ import { Link, Navigate, NavLink, Route, Routes, useNavigate } from 'react-route
 import { clearAuth, getStoredUser } from './api/client.js';
 import Dashboard from './pages/Dashboard.jsx';
 import Home from './pages/Home.jsx';
+import Jobs from './pages/Jobs.jsx';
 import Login from './pages/Login.jsx';
 import Profile from './pages/Profile.jsx';
 import Register from './pages/Register.jsx';
 
 const publicNavItems = [
   { to: '/', label: 'Home' },
+  { to: '/jobs', label: 'Jobs' },
   { to: '/login', label: 'Login' },
   { to: '/register', label: 'Register' },
 ];
 
 const privateNavItems = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/jobs', label: 'Jobs' },
   { to: '/profile', label: 'Profile' },
 ];
 
@@ -76,6 +79,7 @@ function App() {
       <main className="mx-auto max-w-6xl px-6 py-12">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/jobs" element={<Jobs />} />
           <Route
             path="/login"
             element={<Login onAuthSuccess={handleAuthChange} />}

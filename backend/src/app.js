@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import mongoose from 'mongoose';
 import applicationRoutes from './routes/applicationRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
@@ -18,6 +19,14 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
   res.json({ message: 'MERN backend is running' });
+});
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+  });
 });
 
 app.use('/api/applications', applicationRoutes);

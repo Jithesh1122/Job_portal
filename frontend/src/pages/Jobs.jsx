@@ -3,7 +3,13 @@ import {
   applyForJob,
   getMyApplications,
 } from '../api/applications.js';
-import { createJob, deleteJob, getJobs, updateJob } from '../api/jobs.js';
+import {
+  createJob,
+  deleteJob,
+  getJobMatches,
+  getJobs,
+  updateJob,
+} from '../api/jobs.js';
 import { getStoredUser } from '../api/client.js';
 
 const emptyForm = {
@@ -50,6 +56,7 @@ function Jobs() {
   const canManageJobs = user?.role === 'recruiter' || user?.role === 'admin';
   const canApplyForJobs = user?.role === 'candidate';
   const [jobs, setJobs] = useState([]);
+  const [jobMatches, setJobMatches] = useState({});
   const [applications, setApplications] = useState([]);
   const [resumeFiles, setResumeFiles] = useState({});
   const [filters, setFilters] = useState(emptyFilters);
@@ -85,6 +92,27 @@ function Jobs() {
     }
   };
 
+  const loadJobMatches = async (activeFilters = filters) => {
+    if (!canApplyForJobs) {
+      return;
+    }
+
+    try {
+      const data = await getJobMatches({
+        keyword: activeFilters.keyword,
+        location: activeFilters.location,
+        skills: activeFilters.skills,
+        ...parseSalaryRange(activeFilters.salaryRange),
+      });
+      const matchesByJobId = Object.fromEntries(
+        data.matches.map((match) => [match.jobId, match]),
+      );
+      setJobMatches(matchesByJobId);
+    } catch (matchError) {
+      setError(matchError.message);
+    }
+  };
+
   const loadApplications = async () => {
     if (!canApplyForJobs) {
       return;
@@ -100,6 +128,7 @@ function Jobs() {
 
   useEffect(() => {
     loadJobs(filters);
+    loadJobMatches(filters);
   }, []);
 
   useEffect(() => {
@@ -129,6 +158,7 @@ function Jobs() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       loadJobs(filters);
+      loadJobMatches(filters);
     }, 300);
 
     return () => clearTimeout(timeoutId);
@@ -188,6 +218,7 @@ function Jobs() {
 
       resetForm();
       await loadJobs(filters);
+      await loadJobMatches(filters);
     } catch (jobError) {
       setError(jobError.message);
     }
@@ -214,6 +245,7 @@ function Jobs() {
       await deleteJob(jobId);
       setStatus('Job deleted successfully');
       await loadJobs(filters);
+      await loadJobMatches(filters);
     } catch (jobError) {
       setError(jobError.message);
     }
@@ -248,6 +280,12 @@ function Jobs() {
       setError(applicationError.message);
     }
   };
+
+  const getJobMatch = (jobId) =>
+    jobMatches[jobId] || {
+      matchPercentage: 0,
+      matchedSkills: [],
+    };
 
   return (
     <section className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
@@ -449,15 +487,32 @@ function Jobs() {
         ) : null}
         {jobs.map((job) => (
           <article
-            className="rounded-lg border border-white/10 bg-white/[0.04] p-6"
+            className={`rounded-lg border p-6 ${
+              canApplyForJobs && getJobMatch(job._id).matchPercentage >= 50
+                ? 'border-emerald-400/50 bg-emerald-400/[0.08]'
+                : 'border-white/10 bg-white/[0.04]'
+            }`}
             key={job._id}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold">{job.title}</h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-2xl font-semibold">{job.title}</h2>
+                  {canApplyForJobs ? (
+                    <span className="rounded-md bg-slate-900 px-3 py-1 text-sm font-semibold text-emerald-200">
+                      {getJobMatch(job._id).matchPercentage}% Match
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-sm text-slate-400">
                   {job.location} {job.salary ? `| Salary: ${job.salary}` : ''}
                 </p>
+                {canApplyForJobs &&
+                getJobMatch(job._id).matchedSkills.length > 0 ? (
+                  <p className="mt-2 text-sm text-emerald-200">
+                    Matched skills: {getJobMatch(job._id).matchedSkills.join(', ')}
+                  </p>
+                ) : null}
               </div>
               {canManageJobs && canEditJob(job) ? (
                 <div className="flex gap-2">

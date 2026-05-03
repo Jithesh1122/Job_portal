@@ -3,6 +3,7 @@ import {
   createJob,
   deleteJob,
   getJobById,
+  getJobMatches,
   getJobs,
   updateJob,
 } from '../controllers/jobController.js';
@@ -14,6 +15,8 @@ router
   .route('/')
   .get(getJobs)
   .post(protect, authorizeRoles('recruiter', 'admin'), createJob);
+
+router.get('/matches', protect, authorizeRoles('candidate'), getJobMatches);
 
 router
   .route('/:id')

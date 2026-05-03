@@ -14,6 +14,20 @@ export const getJobs = (filters = {}) => {
   return apiRequest(`/jobs${queryString ? `?${queryString}` : ''}`);
 };
 
+export const getJobMatches = (filters = {}) => {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) {
+      params.set(key, value);
+    }
+  });
+
+  const queryString = params.toString();
+
+  return apiRequest(`/jobs/matches${queryString ? `?${queryString}` : ''}`);
+};
+
 export const createJob = (payload) =>
   apiRequest('/jobs', {
     method: 'POST',

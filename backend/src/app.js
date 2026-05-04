@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import applicationRoutes from './routes/applicationRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
@@ -31,6 +32,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/applications', applicationRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 

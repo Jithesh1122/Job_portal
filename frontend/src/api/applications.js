@@ -38,3 +38,40 @@ export const applyForJob = async (jobId, resumeFile) => {
 
   return data;
 };
+
+export const getRecruiterApplications = async () => {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/applications/recruiter`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to load applicants');
+  }
+
+  return data;
+};
+
+export const updateApplicationStatus = async (applicationId, status) => {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/applications/${applicationId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update application');
+  }
+
+  return data;
+};

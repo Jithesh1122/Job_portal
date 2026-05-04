@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { clearAuth, getStoredUser } from './api/client.js';
+import NotificationBell from './components/NotificationBell.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Home from './pages/Home.jsx';
 import Jobs from './pages/Jobs.jsx';
@@ -64,13 +65,16 @@ function App() {
               </NavLink>
             ))}
             {user ? (
-              <button
-                className="rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
-                onClick={handleLogout}
-                type="button"
-              >
-                Logout
-              </button>
+              <>
+                <NotificationBell />
+                <button
+                  className="rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                  onClick={handleLogout}
+                  type="button"
+                >
+                  Logout
+                </button>
+              </>
             ) : null}
           </div>
         </nav>

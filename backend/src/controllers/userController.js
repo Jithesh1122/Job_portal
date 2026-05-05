@@ -1,4 +1,8 @@
 import User from '../models/User.js';
+import Application from '../models/Application.js';
+import Job from '../models/Job.js';
+import Notification from '../models/Notification.js';
+import Profile from '../models/Profile.js';
 import generateToken from '../utils/generateToken.js';
 
 const sendAuthResponse = (res, statusCode, user) => {
@@ -9,6 +13,7 @@ const sendAuthResponse = (res, statusCode, user) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isBlocked: user.isBlocked,
     },
   });
 };
@@ -58,6 +63,11 @@ export const loginUser = async (req, res, next) => {
       throw new Error('Invalid email or password');
     }
 
+    if (user.isBlocked) {
+      res.status(403);
+      throw new Error('Your account has been blocked');
+    }
+
     sendAuthResponse(res, 200, user);
   } catch (error) {
     next(error);
@@ -71,6 +81,70 @@ export const getUserProfile = (req, res) => {
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
+      isBlocked: req.user.isBlocked,
     },
   });
+};
+
+export const getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const toggleUserBlockStatus = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (user._id.toString() === req.user._id.toString()) {
+      res.status(400);
+      throw new Error('Admin cannot block the currently logged in user');
+    }
+
+    user.isBlocked = !user.isBlocked;
+    await user.save();
+
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (user._id.toString() === req.user._id.toString()) {
+      res.status(400);
+      throw new Error('Admin cannot delete the currently logged in user');
+    }
+
+    const ownedJobs = await Job.find({ recruiterId: user._id }).select('_id');
+    const ownedJobIds = ownedJobs.map((job) => job._id);
+
+    await Profile.deleteOne({ user: user._id });
+    await Application.deleteMany({
+      $or: [{ userId: user._id }, { jobId: { $in: ownedJobIds } }],
+    });
+    await Notification.deleteMany({ userId: user._id });
+    await Job.deleteMany({ recruiterId: user._id });
+    await user.deleteOne();
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
 };

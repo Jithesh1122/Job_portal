@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   applyForJob,
+  getAllApplications,
   getMyApplications,
   getRecruiterApplications,
   updateApplicationStatus,
@@ -23,6 +24,12 @@ router.get(
   protect,
   authorizeRoles('recruiter', 'admin'),
   getRecruiterApplications,
+);
+router.get(
+  '/admin',
+  protect,
+  authorizeRoles('admin'),
+  getAllApplications,
 );
 router.patch(
   '/:id/status',

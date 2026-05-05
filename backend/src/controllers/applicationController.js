@@ -133,6 +133,22 @@ export const getRecruiterApplications = async (req, res, next) => {
   }
 };
 
+export const getAllApplications = async (req, res, next) => {
+  try {
+    const applications = await Application.find()
+      .populate({
+        path: 'jobId',
+        populate: { path: 'recruiterId', select: 'name email role' },
+      })
+      .populate('userId', 'name email role')
+      .sort({ createdAt: -1 });
+
+    res.json({ applications });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateApplicationStatus = async (req, res, next) => {
   try {
     const { status } = req.body;

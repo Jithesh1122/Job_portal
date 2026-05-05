@@ -1,5 +1,7 @@
 import Job from '../models/Job.js';
+import Application from '../models/Application.js';
 import Profile from '../models/Profile.js';
+import User from '../models/User.js';
 
 const normalizeJobPayload = (payload) => ({
   title: payload.title,
@@ -61,6 +63,24 @@ const buildJobQuery = (queryParams) => {
   return query;
 };
 
+const buildVisibilityQuery = (user) => {
+  if (!user) {
+    return { status: 'approved' };
+  }
+
+  if (user.role === 'admin') {
+    return {};
+  }
+
+  if (user.role === 'recruiter') {
+    return {
+      $or: [{ status: 'approved' }, { recruiterId: user._id }],
+    };
+  }
+
+  return { status: 'approved' };
+};
+
 const ensureJobOwnerOrAdmin = (job, user) => {
   if (user.role === 'admin') {
     return;
@@ -101,7 +121,10 @@ const calculateMatch = (profileSkills, jobSkills) => {
 
 export const getJobs = async (req, res, next) => {
   try {
-    const jobs = await Job.find(buildJobQuery(req.query))
+    const jobs = await Job.find({
+      ...buildVisibilityQuery(req.user),
+      ...buildJobQuery(req.query),
+    })
       .populate('recruiterId', 'name email role')
       .sort({ createdAt: -1 });
 
@@ -114,7 +137,10 @@ export const getJobs = async (req, res, next) => {
 export const getJobMatches = async (req, res, next) => {
   try {
     const profile = await Profile.findOne({ user: req.user._id });
-    const jobs = await Job.find(buildJobQuery(req.query)).select('skills');
+    const jobs = await Job.find({
+      status: 'approved',
+      ...buildJobQuery(req.query),
+    }).select('skills');
 
     const matches = jobs.map((job) => {
       const match = calculateMatch(profile?.skills || [], job.skills || []);
@@ -143,6 +169,13 @@ export const getJobById = async (req, res, next) => {
       throw new Error('Job not found');
     }
 
+    const isOwner = req.user && job.recruiterId?._id?.toString() === req.user._id.toString();
+
+    if (job.status !== 'approved' && !(req.user?.role === 'admin' || isOwner)) {
+      res.status(404);
+      throw new Error('Job not found');
+    }
+
     res.json({ job });
   } catch (error) {
     next(error);
@@ -161,6 +194,7 @@ export const createJob = async (req, res, next) => {
     const job = await Job.create({
       ...jobData,
       recruiterId: req.user._id,
+      status: req.user.role === 'admin' ? 'approved' : 'pending',
     });
 
     const populatedJob = await job.populate('recruiterId', 'name email role');
@@ -207,6 +241,7 @@ export const deleteJob = async (req, res, next) => {
 
     ensureJobOwnerOrAdmin(job, req.user);
 
+    await Application.deleteMany({ jobId: job._id });
     await job.deleteOne();
 
     res.json({ message: 'Job deleted successfully' });
@@ -214,6 +249,72 @@ export const deleteJob = async (req, res, next) => {
     if (error.statusCode) {
       res.status(error.statusCode);
     }
+    next(error);
+  }
+};
+
+export const getAllJobsAdmin = async (req, res, next) => {
+  try {
+    const jobs = await Job.find()
+      .populate('recruiterId', 'name email role')
+      .sort({ createdAt: -1 });
+
+    res.json({ jobs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateJobStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const allowedStatuses = ['approved', 'rejected'];
+
+    if (!allowedStatuses.includes(status)) {
+      res.status(400);
+      throw new Error('Invalid job status');
+    }
+
+    const job = await Job.findById(req.params.id).populate(
+      'recruiterId',
+      'name email role',
+    );
+
+    if (!job) {
+      res.status(404);
+      throw new Error('Job not found');
+    }
+
+    job.status = status;
+    await job.save();
+
+    res.json({ job });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPlatformStats = async (req, res, next) => {
+  try {
+    const [totalUsers, totalJobs, totalApplications, blockedUsers, pendingJobs] =
+      await Promise.all([
+        User.countDocuments(),
+        Job.countDocuments(),
+        Application.countDocuments(),
+        User.countDocuments({ isBlocked: true }),
+        Job.countDocuments({ status: 'pending' }),
+      ]);
+
+    res.json({
+      stats: {
+        totalUsers,
+        totalJobs,
+        totalApplications,
+        blockedUsers,
+        pendingJobs,
+      },
+    });
+  } catch (error) {
     next(error);
   }
 };

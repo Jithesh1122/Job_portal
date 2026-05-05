@@ -19,6 +19,11 @@ export const protect = async (req, res, next) => {
       throw new Error('Not authorized, user not found');
     }
 
+    if (user.isBlocked) {
+      res.status(403);
+      throw new Error('User account is blocked');
+    }
+
     req.user = user;
     req.auth = {
       id: decoded.id,

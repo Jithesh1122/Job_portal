@@ -5,6 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "create-admin": "node scripts/createAdmin.js",
     "dev": "nodemon server.js",
     "start": "node server.js"
   },

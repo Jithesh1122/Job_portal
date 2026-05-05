@@ -3,7 +3,7 @@ import generateToken from '../utils/generateToken.js';
 
 const sendAuthResponse = (res, statusCode, user) => {
   res.status(statusCode).json({
-    token: generateToken(user._id),
+    token: generateToken(user),
     user: {
       id: user._id,
       name: user.name,

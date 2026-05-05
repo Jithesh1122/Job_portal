@@ -20,6 +20,10 @@ export const protect = async (req, res, next) => {
     }
 
     req.user = user;
+    req.auth = {
+      id: decoded.id,
+      role: decoded.role,
+    };
     next();
   } catch (error) {
     res.status(401);
@@ -37,3 +41,7 @@ export const authorizeRoles = (...roles) => {
     return next();
   };
 };
+
+export const requireAuth = protect;
+
+export const requireRole = (...roles) => authorizeRoles(...roles);

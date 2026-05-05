@@ -21,6 +21,21 @@ CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
+To manually create or update a default admin user, add admin credentials to
+`backend/.env`:
+
+```env
+ADMIN_NAME=Admin User
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=change_this_admin_password
+```
+
+Then run:
+
+```bash
+npm run create-admin
+```
+
 ## Frontend
 
 ```bash

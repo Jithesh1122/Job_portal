@@ -1,46 +1,67 @@
-import { Readable } from 'stream';
-import cloudinary from '../config/cloudinary.js';
 import Application from '../models/Application.js';
 import Job from '../models/Job.js';
 import Notification from '../models/Notification.js';
+import Profile from '../models/Profile.js';
+import { calculateMatch } from '../utils/skillMatching.js';
+import { uploadFileToCloudinary } from '../utils/uploadToCloudinary.js';
 
-const getSafePublicId = (originalName) => {
-  const nameWithoutExtension = originalName.replace(/\.[^/.]+$/, '');
-  return nameWithoutExtension
-    .replace(/[^a-zA-Z0-9-_]/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 80);
-};
+const attachProfilesAndMatches = async (applications) => {
+  const candidateIds = [
+    ...new Set(applications.map((application) => application.userId?._id?.toString()).filter(Boolean)),
+  ];
+  const profiles = await Profile.find({ user: { $in: candidateIds } });
+  const profilesByUserId = new Map(
+    profiles.map((profile) => [profile.user.toString(), profile]),
+  );
 
-const uploadBufferToCloudinary = (file) => {
-  if (
-    !process.env.CLOUDINARY_CLOUD_NAME ||
-    !process.env.CLOUDINARY_API_KEY ||
-    !process.env.CLOUDINARY_API_SECRET
-  ) {
-    throw new Error('Cloudinary environment variables are not configured');
-  }
+  return applications.map((application) => {
+    const profile = profilesByUserId.get(application.userId?._id?.toString());
+    const match = calculateMatch(profile?.skills || [], application.jobId?.skills || []);
 
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'mern-job-resumes',
-        public_id: `${Date.now()}-${getSafePublicId(file.originalname)}`,
-        resource_type: 'raw',
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(result);
-      },
-    );
-
-    Readable.from(file.buffer).pipe(uploadStream);
+    return {
+      ...application.toObject(),
+      candidateProfile: profile
+        ? {
+            skills: profile.skills || [],
+            education: profile.education || [],
+            experience: profile.experience || [],
+          }
+        : null,
+      ...match,
+    };
   });
 };
+
+const ensureApplicationAccess = (application, user) => {
+  if (!application || !application.jobId) {
+    const error = new Error('Application not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.role === 'admin') {
+    return;
+  }
+
+  if (user.role === 'candidate' && application.userId?._id?.toString() === user._id.toString()) {
+    return;
+  }
+
+  if (user.role === 'recruiter' && application.jobId.recruiterId?.toString() === user._id.toString()) {
+    return;
+  }
+
+  const error = new Error('Not authorized to access this resume');
+  error.statusCode = 403;
+  throw error;
+};
+
+const isProfileComplete = (profile) =>
+  Boolean(
+    profile &&
+      profile.skills?.length &&
+      profile.education?.length,
+  );
 
 export const applyForJob = async (req, res, next) => {
   try {
@@ -68,12 +89,31 @@ export const applyForJob = async (req, res, next) => {
       throw new Error('You have already applied for this job');
     }
 
-    const uploadedResume = await uploadBufferToCloudinary(req.file);
+    if (job.status !== 'approved') {
+      res.status(400);
+      throw new Error('This job is not accepting applications right now');
+    }
+
+    const profile = await Profile.findOne({ user: req.user._id });
+
+    if (!isProfileComplete(profile)) {
+      res.status(400);
+      throw new Error(
+        'Complete your profile with skills and education before applying',
+      );
+    }
+
+    const uploadedResume = await uploadFileToCloudinary(
+      req.file,
+      'mern-job-resumes',
+    );
 
     const application = await Application.create({
       userId: req.user._id,
       jobId,
       resumeUrl: uploadedResume.secure_url,
+      resumePublicId: uploadedResume.public_id,
+      resumeFileName: req.file.originalname,
     });
 
     const populatedApplication = await application.populate([
@@ -126,7 +166,11 @@ export const getRecruiterApplications = async (req, res, next) => {
       .sort({ createdAt: -1 });
 
     res.json({
-      applications: applications.filter((application) => application.jobId),
+      applications: (
+        await attachProfilesAndMatches(
+          applications.filter((application) => application.jobId),
+        )
+      ).sort((a, b) => b.matchPercentage - a.matchPercentage),
     });
   } catch (error) {
     next(error);
@@ -143,7 +187,7 @@ export const getAllApplications = async (req, res, next) => {
       .populate('userId', 'name email role')
       .sort({ createdAt: -1 });
 
-    res.json({ applications });
+    res.json({ applications: await attachProfilesAndMatches(applications) });
   } catch (error) {
     next(error);
   }
@@ -191,6 +235,45 @@ export const updateApplicationStatus = async (req, res, next) => {
 
     res.json({ application: populatedApplication });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const downloadApplicationResume = async (req, res, next) => {
+  try {
+    const application = await Application.findById(req.params.id)
+      .populate({
+        path: 'jobId',
+        select: 'title recruiterId',
+      })
+      .populate('userId', 'name email role');
+
+    ensureApplicationAccess(application, req.user);
+
+    const response = await fetch(application.resumeUrl);
+
+    if (!response.ok) {
+      res.status(502);
+      throw new Error('Failed to fetch resume from storage');
+    }
+
+    const fileName =
+      application.resumeFileName ||
+      `${application.userId?.name || 'candidate'}-resume`;
+    const contentType =
+      response.headers.get('content-type') || 'application/octet-stream';
+    const arrayBuffer = await response.arrayBuffer();
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileName.replace(/"/g, '')}"`,
+    );
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    if (error.statusCode) {
+      res.status(error.statusCode);
+    }
     next(error);
   }
 };

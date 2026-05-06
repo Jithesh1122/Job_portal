@@ -5,16 +5,31 @@ const removeEmptyValues = (item) =>
     Object.entries(item).filter(([, value]) => value !== '' && value !== null),
   );
 
+const parseJsonField = (value, fallback) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  try {
+    const parsedValue = JSON.parse(value);
+    return Array.isArray(parsedValue) ? parsedValue : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const normalizeProfilePayload = (payload) => ({
-  skills: Array.isArray(payload.skills)
-    ? payload.skills.map((skill) => skill.trim()).filter(Boolean)
-    : [],
-  education: Array.isArray(payload.education)
-    ? payload.education.map(removeEmptyValues)
-    : [],
-  experience: Array.isArray(payload.experience)
-    ? payload.experience.map(removeEmptyValues)
-    : [],
+  skills: parseJsonField(payload.skills, [])
+    .map((skill) => String(skill).trim())
+    .filter(Boolean),
+  education: parseJsonField(payload.education, [])
+    .map(removeEmptyValues),
+  experience: parseJsonField(payload.experience, [])
+    .map(removeEmptyValues),
 });
 
 export const getMyProfile = async (req, res, next) => {
@@ -61,10 +76,14 @@ export const upsertMyProfile = async (req, res, next) => {
 export const getProfilesForRecruiters = async (req, res, next) => {
   try {
     const profiles = await Profile.find()
-      .populate('user', 'name email role')
+      .populate({
+        path: 'user',
+        select: 'name email role',
+        match: { role: 'candidate' },
+      })
       .sort({ updatedAt: -1 });
 
-    res.json({ profiles });
+    res.json({ profiles: profiles.filter((profile) => profile.user) });
   } catch (error) {
     next(error);
   }

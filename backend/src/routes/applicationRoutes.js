@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   applyForJob,
+  downloadApplicationResume,
   getAllApplications,
   getMyApplications,
   getRecruiterApplications,
@@ -12,6 +13,12 @@ import { uploadResume } from '../middleware/uploadMiddleware.js';
 const router = express.Router();
 
 router.get('/me', protect, authorizeRoles('candidate'), getMyApplications);
+router.get(
+  '/:id/resume',
+  protect,
+  authorizeRoles('candidate', 'recruiter', 'admin'),
+  downloadApplicationResume,
+);
 router.post(
   '/jobs/:jobId',
   protect,

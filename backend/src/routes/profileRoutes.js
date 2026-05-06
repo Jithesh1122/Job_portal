@@ -12,8 +12,8 @@ router.use(protect);
 
 router
   .route('/me')
-  .get(getMyProfile)
-  .put(upsertMyProfile);
+  .get(authorizeRoles('candidate'), getMyProfile)
+  .put(authorizeRoles('candidate'), upsertMyProfile);
 
 router.get(
   '/candidates',

@@ -10,13 +10,13 @@ import {
   updateJob,
   updateJobStatus,
 } from '../controllers/jobController.js';
-import { authorizeRoles, protect } from '../middleware/authMiddleware.js';
+import { authorizeRoles, optionalProtect, protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router
   .route('/')
-  .get(getJobs)
+  .get(optionalProtect, getJobs)
   .post(protect, authorizeRoles('recruiter', 'admin'), createJob);
 
 router.get('/admin', protect, authorizeRoles('admin'), getAllJobsAdmin);
@@ -26,7 +26,7 @@ router.get('/matches', protect, authorizeRoles('candidate'), getJobMatches);
 
 router
   .route('/:id')
-  .get(getJobById)
+  .get(optionalProtect, getJobById)
   .put(protect, authorizeRoles('recruiter', 'admin'), updateJob)
   .delete(protect, authorizeRoles('recruiter', 'admin'), deleteJob);
 

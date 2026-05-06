@@ -21,10 +21,16 @@ const sendAuthResponse = (res, statusCode, user) => {
 export const registerUser = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
+    const allowedRoles = ['candidate', 'recruiter'];
 
     if (!name || !email || !password) {
       res.status(400);
       throw new Error('Name, email, and password are required');
+    }
+
+    if (role && !allowedRoles.includes(role)) {
+      res.status(403);
+      throw new Error('Invalid role for public registration');
     }
 
     const existingUser = await User.findOne({ email });
@@ -38,7 +44,7 @@ export const registerUser = async (req, res, next) => {
       name,
       email,
       password,
-      role,
+      role: role || 'candidate',
     });
 
     sendAuthResponse(res, 201, user);

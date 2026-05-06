@@ -16,6 +16,14 @@ const applicationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    resumePublicId: {
+      type: String,
+      trim: true,
+    },
+    resumeFileName: {
+      type: String,
+      trim: true,
+    },
     status: {
       type: String,
       enum: ['applied', 'reviewed', 'shortlisted', 'rejected'],

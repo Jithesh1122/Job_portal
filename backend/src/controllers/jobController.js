@@ -3,15 +3,16 @@ import Application from '../models/Application.js';
 import Profile from '../models/Profile.js';
 import User from '../models/User.js';
 import { calculateMatch } from '../utils/skillMatching.js';
+import { normalizeString } from '../utils/validation.js';
 
 const normalizeJobPayload = (payload) => ({
-  title: payload.title,
-  description: payload.description,
+  title: normalizeString(payload.title),
+  description: normalizeString(payload.description),
   skills: Array.isArray(payload.skills)
     ? payload.skills.map((skill) => skill.trim()).filter(Boolean)
     : [],
   salary: payload.salary === '' || payload.salary === undefined ? undefined : Number(payload.salary),
-  location: payload.location,
+  location: normalizeString(payload.location),
 });
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -178,6 +179,11 @@ export const createJob = async (req, res, next) => {
       throw new Error('Title, description, and location are required');
     }
 
+    if (jobData.salary !== undefined && Number.isNaN(jobData.salary)) {
+      res.status(400);
+      throw new Error('Salary must be a valid number');
+    }
+
     if (req.user.role === 'recruiter' && !req.user.isApproved) {
       res.status(403);
       throw new Error('Your recruiter account must be approved before posting jobs');
@@ -207,8 +213,20 @@ export const updateJob = async (req, res, next) => {
     }
 
     ensureJobOwnerOrAdmin(job, req.user);
+    
+    const updatedJobData = normalizeJobPayload(req.body);
 
-    Object.assign(job, normalizeJobPayload(req.body));
+    if (!updatedJobData.title || !updatedJobData.description || !updatedJobData.location) {
+      res.status(400);
+      throw new Error('Title, description, and location are required');
+    }
+
+    if (updatedJobData.salary !== undefined && Number.isNaN(updatedJobData.salary)) {
+      res.status(400);
+      throw new Error('Salary must be a valid number');
+    }
+
+    Object.assign(job, updatedJobData);
     await job.save();
 
     const populatedJob = await job.populate('recruiterId', 'name companyName email role isApproved');

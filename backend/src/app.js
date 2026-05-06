@@ -7,16 +7,29 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
+import { parseAllowedOrigins } from './utils/validation.js';
 
 const app = express();
+const allowedOrigins = parseAllowedOrigins();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      const corsError = new Error('CORS origin not allowed');
+      corsError.statusCode = 403;
+      callback(corsError);
+    },
     credentials: true,
   }),
 );
+app.options('*', cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (req, res) => {
   res.json({ message: 'MERN backend is running' });

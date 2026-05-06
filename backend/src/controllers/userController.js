@@ -4,6 +4,11 @@ import Job from '../models/Job.js';
 import Notification from '../models/Notification.js';
 import Profile from '../models/Profile.js';
 import generateToken from '../utils/generateToken.js';
+import {
+  ensureMinLength,
+  isValidEmail,
+  normalizeString,
+} from '../utils/validation.js';
 
 const sendAuthResponse = (res, statusCode, user) => {
   res.status(statusCode).json({
@@ -22,7 +27,11 @@ const sendAuthResponse = (res, statusCode, user) => {
 
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, companyName, email, password, role } = req.body;
+    const { role } = req.body;
+    const name = normalizeString(req.body.name);
+    const companyName = normalizeString(req.body.companyName);
+    const email = normalizeString(req.body.email).toLowerCase();
+    const password = String(req.body.password || '');
     const allowedRoles = ['candidate', 'recruiter'];
 
     if (!name || !email || !password) {
@@ -30,12 +39,22 @@ export const registerUser = async (req, res, next) => {
       throw new Error('Name, email, and password are required');
     }
 
+    if (!isValidEmail(email)) {
+      res.status(400);
+      throw new Error('Please enter a valid email address');
+    }
+
+    if (!ensureMinLength(password, 6)) {
+      res.status(400);
+      throw new Error('Password must be at least 6 characters long');
+    }
+
     if (role && !allowedRoles.includes(role)) {
       res.status(403);
       throw new Error('Invalid role for public registration');
     }
 
-    if (role === 'recruiter' && !String(companyName || '').trim()) {
+    if (role === 'recruiter' && !companyName) {
       res.status(400);
       throw new Error('Company name is required for recruiter accounts');
     }
@@ -49,7 +68,7 @@ export const registerUser = async (req, res, next) => {
 
     const user = await User.create({
       name,
-      companyName: role === 'recruiter' ? String(companyName).trim() : undefined,
+      companyName: role === 'recruiter' ? companyName : undefined,
       email,
       password,
       role: role || 'candidate',
@@ -63,11 +82,17 @@ export const registerUser = async (req, res, next) => {
 
 export const loginUser = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const email = normalizeString(req.body.email).toLowerCase();
+    const password = String(req.body.password || '');
 
     if (!email || !password) {
       res.status(400);
       throw new Error('Email and password are required');
+    }
+
+    if (!isValidEmail(email)) {
+      res.status(400);
+      throw new Error('Please enter a valid email address');
     }
 
     const user = await User.findOne({ email }).select('+password');

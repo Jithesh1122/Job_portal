@@ -115,7 +115,14 @@ function Jobs() {
         skills: activeFilters.skills,
         ...parseSalaryRange(activeFilters.salaryRange),
       });
+
+      const locations = [
+        ...new Set(data.jobs.map((job) => job.location).filter(Boolean)),
+      ].sort();
+      const skills = [...new Set(data.jobs.flatMap((job) => job.skills || []))].sort();
+
       setJobs(data.jobs);
+      setFilterOptions({ locations, skills });
       setSelectedJobId((currentSelectedJobId) => {
         if (currentSelectedJobId && data.jobs.some((job) => job._id === currentSelectedJobId)) {
           return currentSelectedJobId;
@@ -190,24 +197,6 @@ function Jobs() {
 
     loadProfile();
   }, [canApplyForJobs]);
-
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      try {
-        const data = await getJobs();
-        const locations = [
-          ...new Set(data.jobs.map((job) => job.location).filter(Boolean)),
-        ].sort();
-        const skills = [...new Set(data.jobs.flatMap((job) => job.skills || []))].sort();
-
-        setFilterOptions({ locations, skills });
-      } catch (jobsError) {
-        setError(jobsError.message);
-      }
-    };
-
-    loadFilterOptions();
-  }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

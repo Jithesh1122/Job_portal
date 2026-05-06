@@ -1,4 +1,5 @@
 import Profile from '../models/Profile.js';
+import { isValidEmail, normalizeString } from '../utils/validation.js';
 
 const removeEmptyValues = (item) =>
   Object.fromEntries(
@@ -27,16 +28,16 @@ const normalizeProfilePayload = (payload) => {
 
   return {
     contactDetails: removeEmptyValues({
-      phone: contactSource.phone || '',
-      alternateEmail: contactSource.alternateEmail || '',
+      phone: normalizeString(contactSource.phone),
+      alternateEmail: normalizeString(contactSource.alternateEmail).toLowerCase(),
     }),
-  skills: parseJsonField(payload.skills, [])
-    .map((skill) => String(skill).trim())
-    .filter(Boolean),
-  education: parseJsonField(payload.education, [])
-    .map(removeEmptyValues),
-  experience: parseJsonField(payload.experience, [])
-    .map(removeEmptyValues),
+    skills: parseJsonField(payload.skills, [])
+      .map((skill) => String(skill).trim())
+      .filter(Boolean),
+    education: parseJsonField(payload.education, [])
+      .map(removeEmptyValues),
+    experience: parseJsonField(payload.experience, [])
+      .map(removeEmptyValues),
   };
 };
 
@@ -66,6 +67,14 @@ export const getMyProfile = async (req, res, next) => {
 export const upsertMyProfile = async (req, res, next) => {
   try {
     const profileData = normalizeProfilePayload(req.body);
+
+    if (
+      profileData.contactDetails.alternateEmail &&
+      !isValidEmail(profileData.contactDetails.alternateEmail)
+    ) {
+      res.status(400);
+      throw new Error('Please enter a valid alternate email address');
+    }
 
     const profile = await Profile.findOneAndUpdate(
       { user: req.user._id },

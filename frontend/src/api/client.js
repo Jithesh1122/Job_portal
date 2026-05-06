@@ -12,22 +12,50 @@ export const clearAuth = () => {
   sessionStorage.removeItem('user');
 };
 
-export const apiRequest = async (path, options = {}) => {
-  const token = getToken();
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+const buildHeaders = (headers = {}, includeJson = true) => ({
+  ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+  ...headers,
+});
 
-  const data = await response.json();
+const parseResponse = async (response) => {
+  const contentType = response.headers.get('content-type') || '';
 
-  if (!response.ok) {
-    throw new Error(data.message || 'Request failed');
+  if (contentType.includes('application/json')) {
+    return response.json();
   }
 
-  return data;
+  return response.text();
+};
+
+export const apiRequest = async (path, options = {}) => {
+  const token = getToken();
+
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: buildHeaders(
+        {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...options.headers,
+        },
+        options.body instanceof FormData ? false : !options.headers?.['Content-Type'] || options.headers['Content-Type'] === 'application/json',
+      ),
+    });
+
+    const data = await parseResponse(response);
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data === 'object' && data?.message ? data.message : 'Request failed',
+      );
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the server. Please try again in a moment.');
+    }
+
+    throw error;
+  }
 };

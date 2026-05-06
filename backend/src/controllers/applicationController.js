@@ -4,6 +4,7 @@ import Notification from '../models/Notification.js';
 import Profile from '../models/Profile.js';
 import { calculateMatch } from '../utils/skillMatching.js';
 import { uploadFileToCloudinary } from '../utils/uploadToCloudinary.js';
+import { normalizeString } from '../utils/validation.js';
 
 const attachProfilesAndMatches = async (applications) => {
   const candidateIds = [
@@ -71,6 +72,22 @@ export const applyForJob = async (req, res, next) => {
     if (!req.file) {
       res.status(400);
       throw new Error('Resume file is required');
+    }
+
+    const allowedMimeTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      res.status(400);
+      throw new Error('Resume must be a PDF, DOC, or DOCX file');
+    }
+
+    if (req.file.size > 5 * 1024 * 1024) {
+      res.status(400);
+      throw new Error('Resume file size must be 5MB or less');
     }
 
     const job = await Job.findById(jobId);
@@ -242,11 +259,16 @@ export const updateApplicationStatus = async (req, res, next) => {
 
 export const sendShortlistedCandidateMessage = async (req, res, next) => {
   try {
-    const message = String(req.body.message || '').trim();
+    const message = normalizeString(req.body.message);
 
     if (!message) {
       res.status(400);
       throw new Error('Message is required');
+    }
+
+    if (message.length > 500) {
+      res.status(400);
+      throw new Error('Message must be 500 characters or less');
     }
 
     const application = await Application.findById(req.params.id)

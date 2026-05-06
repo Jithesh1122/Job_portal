@@ -1,15 +1,15 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const getStoredUser = () => {
-  const user = localStorage.getItem('user');
+  const user = sessionStorage.getItem('user');
   return user ? JSON.parse(user) : null;
 };
 
-export const getToken = () => localStorage.getItem('token');
+export const getToken = () => sessionStorage.getItem('token');
 
 export const clearAuth = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
 };
 
 export const apiRequest = async (path, options = {}) => {

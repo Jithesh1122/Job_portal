@@ -20,6 +20,7 @@ const createAdmin = async () => {
     existingAdmin.name = name;
     existingAdmin.password = password;
     existingAdmin.role = 'admin';
+    existingAdmin.isApproved = true;
     await existingAdmin.save();
     console.log(`Admin user updated: ${email}`);
     return;
@@ -30,6 +31,7 @@ const createAdmin = async () => {
     email,
     password,
     role: 'admin',
+    isApproved: true,
   });
 
   console.log(`Admin user created: ${email}`);

@@ -11,16 +11,18 @@ const sendAuthResponse = (res, statusCode, user) => {
     user: {
       id: user._id,
       name: user.name,
+      companyName: user.companyName,
       email: user.email,
       role: user.role,
       isBlocked: user.isBlocked,
+      isApproved: user.isApproved,
     },
   });
 };
 
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, companyName, email, password, role } = req.body;
     const allowedRoles = ['candidate', 'recruiter'];
 
     if (!name || !email || !password) {
@@ -33,6 +35,11 @@ export const registerUser = async (req, res, next) => {
       throw new Error('Invalid role for public registration');
     }
 
+    if (role === 'recruiter' && !String(companyName || '').trim()) {
+      res.status(400);
+      throw new Error('Company name is required for recruiter accounts');
+    }
+
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -42,6 +49,7 @@ export const registerUser = async (req, res, next) => {
 
     const user = await User.create({
       name,
+      companyName: role === 'recruiter' ? String(companyName).trim() : undefined,
       email,
       password,
       role: role || 'candidate',
@@ -85,9 +93,11 @@ export const getUserProfile = (req, res) => {
     user: {
       id: req.user._id,
       name: req.user.name,
+      companyName: req.user.companyName,
       email: req.user.email,
       role: req.user.role,
       isBlocked: req.user.isBlocked,
+      isApproved: req.user.isApproved,
     },
   });
 };
@@ -116,6 +126,29 @@ export const toggleUserBlockStatus = async (req, res, next) => {
     }
 
     user.isBlocked = !user.isBlocked;
+    await user.save();
+
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveRecruiter = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (user.role !== 'recruiter') {
+      res.status(400);
+      throw new Error('Only recruiter accounts can be approved');
+    }
+
+    user.isApproved = true;
     await user.save();
 
     res.json({ user });

@@ -22,6 +22,7 @@ const attachProfilesAndMatches = async (applications) => {
       ...application.toObject(),
       candidateProfile: profile
         ? {
+            contactDetails: profile.contactDetails || {},
             skills: profile.skills || [],
             education: profile.education || [],
             experience: profile.experience || [],
@@ -234,6 +235,50 @@ export const updateApplicationStatus = async (req, res, next) => {
     ]);
 
     res.json({ application: populatedApplication });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendShortlistedCandidateMessage = async (req, res, next) => {
+  try {
+    const message = String(req.body.message || '').trim();
+
+    if (!message) {
+      res.status(400);
+      throw new Error('Message is required');
+    }
+
+    const application = await Application.findById(req.params.id)
+      .populate('jobId')
+      .populate('userId', 'name email role');
+
+    if (!application || !application.jobId) {
+      res.status(404);
+      throw new Error('Application not found');
+    }
+
+    if (
+      req.user.role !== 'admin' &&
+      application.jobId.recruiterId.toString() !== req.user._id.toString()
+    ) {
+      res.status(403);
+      throw new Error('Not authorized to message this candidate');
+    }
+
+    if (application.status !== 'shortlisted') {
+      res.status(400);
+      throw new Error('Messages can only be sent to shortlisted candidates');
+    }
+
+    await Notification.create({
+      userId: application.userId._id,
+      title: `Message about ${application.jobId.title}`,
+      message,
+      type: 'message',
+    });
+
+    res.json({ message: 'Message sent successfully' });
   } catch (error) {
     next(error);
   }

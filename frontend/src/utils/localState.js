@@ -3,6 +3,18 @@ const RECENTLY_VIEWED_JOBS_KEY = 'mern_recently_viewed_jobs';
 const THEME_PREFERENCE_KEY = 'mern_theme_preference';
 const MAX_RECENTLY_VIEWED_JOBS = 6;
 
+const getUserScope = () => {
+  try {
+    const storedUser = sessionStorage.getItem('user');
+    const user = storedUser ? JSON.parse(storedUser) : null;
+    return user?.id || 'guest';
+  } catch {
+    return 'guest';
+  }
+};
+
+const getScopedKey = (key) => `${key}_${getUserScope()}`;
+
 const readJson = (key, fallback) => {
   try {
     const value = localStorage.getItem(key);
@@ -16,7 +28,7 @@ const writeJson = (key, value) => {
   localStorage.setItem(key, JSON.stringify(value));
 };
 
-export const getSavedJobIds = () => readJson(SAVED_JOBS_KEY, []);
+export const getSavedJobIds = () => readJson(getScopedKey(SAVED_JOBS_KEY), []);
 
 export const toggleSavedJobId = (jobId) => {
   const savedJobIds = getSavedJobIds();
@@ -24,11 +36,11 @@ export const toggleSavedJobId = (jobId) => {
     ? savedJobIds.filter((savedId) => savedId !== jobId)
     : [jobId, ...savedJobIds];
 
-  writeJson(SAVED_JOBS_KEY, nextSavedJobIds);
+  writeJson(getScopedKey(SAVED_JOBS_KEY), nextSavedJobIds);
   return nextSavedJobIds;
 };
 
-export const getRecentlyViewedJobs = () => readJson(RECENTLY_VIEWED_JOBS_KEY, []);
+export const getRecentlyViewedJobs = () => readJson(getScopedKey(RECENTLY_VIEWED_JOBS_KEY), []);
 
 export const addRecentlyViewedJob = (job) => {
   const recentlyViewedJobs = getRecentlyViewedJobs();
@@ -45,7 +57,7 @@ export const addRecentlyViewedJob = (job) => {
     ...recentlyViewedJobs.filter((item) => item._id !== job._id),
   ].slice(0, MAX_RECENTLY_VIEWED_JOBS);
 
-  writeJson(RECENTLY_VIEWED_JOBS_KEY, nextRecentlyViewedJobs);
+  writeJson(getScopedKey(RECENTLY_VIEWED_JOBS_KEY), nextRecentlyViewedJobs);
   return nextRecentlyViewedJobs;
 };
 

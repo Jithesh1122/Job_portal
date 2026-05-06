@@ -4,6 +4,19 @@ import {
   markNotificationsRead,
 } from '../api/notifications.js';
 
+const formatNotificationTime = (value) => {
+  if (!value) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+};
+
 function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -16,6 +29,7 @@ function NotificationBell() {
 
   const loadNotifications = async () => {
     try {
+      setError('');
       const data = await getNotifications();
       setNotifications(data.notifications);
     } catch (notificationError) {
@@ -25,19 +39,48 @@ function NotificationBell() {
 
   useEffect(() => {
     loadNotifications();
+
+    const intervalId = window.setInterval(() => {
+      loadNotifications();
+    }, 15000);
+
+    const handleWindowFocus = () => {
+      loadNotifications();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const handleToggle = async () => {
     const nextOpenState = !isOpen;
+    if (nextOpenState) {
+      await loadNotifications();
+    }
+
     setIsOpen(nextOpenState);
 
-    if (nextOpenState && unreadCount > 0) {
-      try {
-        await markNotificationsRead();
-        await loadNotifications();
-      } catch (notificationError) {
-        setError(notificationError.message);
-      }
+    if (!nextOpenState || unreadCount === 0) {
+      return;
+    }
+
+    try {
+      await markNotificationsRead();
+      await loadNotifications();
+    } catch (notificationError) {
+      setError(notificationError.message);
     }
   };
 
@@ -74,6 +117,9 @@ function NotificationBell() {
                   </p>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     {notification.message}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    {formatNotificationTime(notification.createdAt)}
                   </p>
                 </div>
               ))

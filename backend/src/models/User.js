@@ -8,6 +8,13 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    companyName: {
+      type: String,
+      trim: true,
+      required: function companyNameRequired() {
+        return this.role === 'recruiter';
+      },
+    },
     email: {
       type: String,
       required: true,
@@ -29,6 +36,12 @@ const userSchema = new mongoose.Schema(
     isBlocked: {
       type: Boolean,
       default: false,
+    },
+    isApproved: {
+      type: Boolean,
+      default: function defaultApproval() {
+        return this.role !== 'recruiter';
+      },
     },
   },
   {

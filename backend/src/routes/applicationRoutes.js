@@ -5,6 +5,7 @@ import {
   getAllApplications,
   getMyApplications,
   getRecruiterApplications,
+  sendShortlistedCandidateMessage,
   updateApplicationStatus,
 } from '../controllers/applicationController.js';
 import { authorizeRoles, protect } from '../middleware/authMiddleware.js';
@@ -43,6 +44,12 @@ router.patch(
   protect,
   authorizeRoles('recruiter', 'admin'),
   updateApplicationStatus,
+);
+router.post(
+  '/:id/message',
+  protect,
+  authorizeRoles('recruiter', 'admin'),
+  sendShortlistedCandidateMessage,
 );
 
 export default router;

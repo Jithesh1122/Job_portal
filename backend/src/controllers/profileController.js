@@ -22,7 +22,14 @@ const parseJsonField = (value, fallback) => {
   }
 };
 
-const normalizeProfilePayload = (payload) => ({
+const normalizeProfilePayload = (payload) => {
+  const contactSource = payload.contactDetails || payload;
+
+  return {
+    contactDetails: removeEmptyValues({
+      phone: contactSource.phone || '',
+      alternateEmail: contactSource.alternateEmail || '',
+    }),
   skills: parseJsonField(payload.skills, [])
     .map((skill) => String(skill).trim())
     .filter(Boolean),
@@ -30,7 +37,8 @@ const normalizeProfilePayload = (payload) => ({
     .map(removeEmptyValues),
   experience: parseJsonField(payload.experience, [])
     .map(removeEmptyValues),
-});
+  };
+};
 
 export const getMyProfile = async (req, res, next) => {
   try {
@@ -44,6 +52,7 @@ export const getMyProfile = async (req, res, next) => {
         profile ||
         {
           user: req.user,
+          contactDetails: {},
           skills: [],
           education: [],
           experience: [],

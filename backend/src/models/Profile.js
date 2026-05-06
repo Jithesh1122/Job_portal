@@ -54,6 +54,17 @@ const profileSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    contactDetails: {
+      phone: {
+        type: String,
+        trim: true,
+      },
+      alternateEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+    },
     education: [educationSchema],
     experience: [experienceSchema],
   },

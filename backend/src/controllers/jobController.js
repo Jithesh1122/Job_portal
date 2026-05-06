@@ -64,9 +64,18 @@ const buildJobQuery = (queryParams) => {
   return query;
 };
 
-const buildVisibilityQuery = (user) => {
+const getApprovedRecruiterIds = async () => {
+  const approvedRecruiters = await User.find({
+    role: 'recruiter',
+    isApproved: true,
+  }).select('_id');
+
+  return approvedRecruiters.map((recruiter) => recruiter._id);
+};
+
+const buildVisibilityQuery = async (user) => {
   if (!user) {
-    return { status: 'approved' };
+    return { recruiterId: { $in: await getApprovedRecruiterIds() } };
   }
 
   if (user.role === 'admin') {
@@ -75,11 +84,11 @@ const buildVisibilityQuery = (user) => {
 
   if (user.role === 'recruiter') {
     return {
-      $or: [{ status: 'approved' }, { recruiterId: user._id }],
+      $or: [{ recruiterId: { $in: await getApprovedRecruiterIds() } }, { recruiterId: user._id }],
     };
   }
 
-  return { status: 'approved' };
+  return { recruiterId: { $in: await getApprovedRecruiterIds() } };
 };
 
 const ensureJobOwnerOrAdmin = (job, user) => {
@@ -96,11 +105,12 @@ const ensureJobOwnerOrAdmin = (job, user) => {
 
 export const getJobs = async (req, res, next) => {
   try {
+    const visibilityQuery = await buildVisibilityQuery(req.user);
     const jobs = await Job.find({
-      ...buildVisibilityQuery(req.user),
+      ...visibilityQuery,
       ...buildJobQuery(req.query),
     })
-      .populate('recruiterId', 'name email role')
+      .populate('recruiterId', 'name companyName email role isApproved')
       .sort({ createdAt: -1 });
 
     res.json({ jobs });
@@ -112,8 +122,9 @@ export const getJobs = async (req, res, next) => {
 export const getJobMatches = async (req, res, next) => {
   try {
     const profile = await Profile.findOne({ user: req.user._id });
+    const approvedRecruiterIds = await getApprovedRecruiterIds();
     const jobs = await Job.find({
-      status: 'approved',
+      recruiterId: { $in: approvedRecruiterIds },
       ...buildJobQuery(req.query),
     }).select('skills');
 
@@ -136,7 +147,7 @@ export const getJobById = async (req, res, next) => {
   try {
     const job = await Job.findById(req.params.id).populate(
       'recruiterId',
-      'name email role',
+      'name companyName email role isApproved',
     );
 
     if (!job) {
@@ -145,8 +156,9 @@ export const getJobById = async (req, res, next) => {
     }
 
     const isOwner = req.user && job.recruiterId?._id?.toString() === req.user._id.toString();
+    const isVisibleByApproval = job.recruiterId?.isApproved;
 
-    if (job.status !== 'approved' && !(req.user?.role === 'admin' || isOwner)) {
+    if (!isVisibleByApproval && !(req.user?.role === 'admin' || isOwner)) {
       res.status(404);
       throw new Error('Job not found');
     }
@@ -166,13 +178,18 @@ export const createJob = async (req, res, next) => {
       throw new Error('Title, description, and location are required');
     }
 
+    if (req.user.role === 'recruiter' && !req.user.isApproved) {
+      res.status(403);
+      throw new Error('Your recruiter account must be approved before posting jobs');
+    }
+
     const job = await Job.create({
       ...jobData,
       recruiterId: req.user._id,
-      status: req.user.role === 'admin' ? 'approved' : 'pending',
+      status: 'approved',
     });
 
-    const populatedJob = await job.populate('recruiterId', 'name email role');
+    const populatedJob = await job.populate('recruiterId', 'name companyName email role isApproved');
 
     res.status(201).json({ job: populatedJob });
   } catch (error) {
@@ -194,7 +211,7 @@ export const updateJob = async (req, res, next) => {
     Object.assign(job, normalizeJobPayload(req.body));
     await job.save();
 
-    const populatedJob = await job.populate('recruiterId', 'name email role');
+    const populatedJob = await job.populate('recruiterId', 'name companyName email role isApproved');
 
     res.json({ job: populatedJob });
   } catch (error) {
@@ -231,7 +248,7 @@ export const deleteJob = async (req, res, next) => {
 export const getAllJobsAdmin = async (req, res, next) => {
   try {
     const jobs = await Job.find()
-      .populate('recruiterId', 'name email role')
+      .populate('recruiterId', 'name companyName email role isApproved')
       .sort({ createdAt: -1 });
 
     res.json({ jobs });
@@ -271,13 +288,13 @@ export const updateJobStatus = async (req, res, next) => {
 
 export const getPlatformStats = async (req, res, next) => {
   try {
-    const [totalUsers, totalJobs, totalApplications, blockedUsers, pendingJobs] =
+    const [totalUsers, totalJobs, totalApplications, blockedUsers, pendingRecruiters] =
       await Promise.all([
         User.countDocuments(),
         Job.countDocuments(),
         Application.countDocuments(),
         User.countDocuments({ isBlocked: true }),
-        Job.countDocuments({ status: 'pending' }),
+        User.countDocuments({ role: 'recruiter', isApproved: false }),
       ]);
 
     res.json({
@@ -286,7 +303,7 @@ export const getPlatformStats = async (req, res, next) => {
         totalJobs,
         totalApplications,
         blockedUsers,
-        pendingJobs,
+        pendingJobs: pendingRecruiters,
       },
     });
   } catch (error) {

@@ -12,6 +12,11 @@ export const toggleUserBlockStatus = (userId) =>
     method: 'PATCH',
   });
 
+export const approveRecruiter = (userId) =>
+  apiRequest(`/users/admin/${userId}/approve`, {
+    method: 'PATCH',
+  });
+
 export const getAllJobsAdmin = () => apiRequest('/jobs/admin');
 
 export const deleteJobAdmin = (jobId) =>
